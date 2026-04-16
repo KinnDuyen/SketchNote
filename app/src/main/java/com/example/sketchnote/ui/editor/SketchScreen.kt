@@ -1,6 +1,5 @@
 package com.example.sketchnote.ui.editor
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.os.Build
@@ -8,7 +7,6 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,10 +22,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -38,39 +41,34 @@ import com.github.skydoves.colorpicker.compose.*
 import java.io.File
 import java.io.FileOutputStream
 
-val Yellow = Color(0xFFFCC701)
-val BgColor = Color(0xFFFBFCF7)
+val SketchYellow = Color(0xFFFCC701)
+val SketchBg = Color(0xFFFBFCF7)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SketchScreen(
     onBack: () -> Unit,
-    onSave: (String) -> Unit   // trả về đường dẫn file đã lưu
+    onSave: (String) -> Unit
 ) {
     val context = LocalContext.current
-    var sketchViewRef by remember { mutableStateOf<SketchView?>(null) }
-    var selectedColor by remember { mutableStateOf(Color.Black) }
-    var strokeWidth by remember { mutableFloatStateOf(15f) }
-    var selectedBrush by remember { mutableStateOf(BrushType.PENCIL) }
-    var isRulerMode by remember { mutableStateOf(false) }
+    var sketchViewRef        by remember { mutableStateOf<SketchView?>(null) }
+    var selectedColor        by remember { mutableStateOf(Color.Black) }
+    var strokeWidth          by remember { mutableFloatStateOf(15f) }
+    var selectedBrush        by remember { mutableStateOf(BrushType.PENCIL) }
+    var isRulerMode          by remember { mutableStateOf(false) }
     var showColorPickerDialog by remember { mutableStateOf(false) }
-    var canUndo by remember { mutableStateOf(false) }
-    var canRedo by remember { mutableStateOf(false) }
+    var canUndo              by remember { mutableStateOf(false) }
+    var canRedo              by remember { mutableStateOf(false) }
 
     fun refreshUndoRedo() {
         canUndo = sketchViewRef?.canUndo() ?: false
         canRedo = sketchViewRef?.canRedo() ?: false
     }
 
-    // Lưu bitmap ra file trong thư mục sketches, trả về path string
     fun saveBitmapAndReturn(bitmap: Bitmap) {
         try {
-            // Tạo thư mục sketches nếu chưa có
             val sketchDir = File(context.filesDir, "sketches")
-            if (!sketchDir.exists()) {
-                sketchDir.mkdirs()
-            }
-
+            if (!sketchDir.exists()) sketchDir.mkdirs()
             val file = File(sketchDir, "sketch_${System.currentTimeMillis()}.png")
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
@@ -115,7 +113,9 @@ fun SketchScreen(
         if (success) {
             cameraUri.value?.let { uri ->
                 val bitmap = if (Build.VERSION.SDK_INT >= 28) {
-                    ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri))
+                    ImageDecoder.decodeBitmap(
+                        ImageDecoder.createSource(context.contentResolver, uri)
+                    )
                 } else {
                     @Suppress("DEPRECATION")
                     MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
@@ -128,10 +128,10 @@ fun SketchScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgColor)
+            .background(SketchBg)
     ) {
 
-        // ── Top bar: Logo + Share icon ────────────────────────────────────────
+        // ── YC1: Logo dùng Text thuần, to hơn ────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -140,10 +140,22 @@ fun SketchScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.sketchnote),
-                contentDescription = "SketchNote Logo",
-                modifier = Modifier.height(28.dp)
+            // YC1: Text logo thay Image
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(
+                        color = Color(0xFFFCC701),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 26.sp,
+                        fontStyle = FontStyle.Italic
+                    )) { append("Sketch") }
+                    withStyle(SpanStyle(
+                        color = Color(0xFFFCC701),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 26.sp,
+                        fontStyle = FontStyle.Normal
+                    )) { append("Note,") }
+                }
             )
 
             IconButton(
@@ -154,78 +166,115 @@ fun SketchScreen(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.share),
-                    contentDescription = "Chia sẻ",
+                    contentDescription = "Lưu & Chia sẻ",
                     tint = Color(0xFF333333),
                     modifier = Modifier.size(22.dp)
                 )
             }
         }
 
-        // ── Action bar ────────────────────────────────────────────────────────
+        // ── YC2: Back tách riêng, action box chứa 6 icon còn lại ─────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 14.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            ActionIconBtn(drawableRes = R.drawable.arrow, desc = "Quay lại", onClick = onBack)
+            // Mũi tên nằm NGOÀI box
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.arrow),
+                    contentDescription = "Quay lại",
+                    tint = Color.Unspecified,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
 
-            ActionIconBtn(
-                drawableRes = R.drawable.mic,
-                desc = "Ghi âm",
-                onClick = { },
-                isSelected = false
-            )
-
-            ActionIconBtn(
-                drawableRes = R.drawable.pen,
-                desc = "Bút",
-                onClick = {
-                    selectedBrush = BrushType.PENCIL
-                    isRulerMode = false
-                    sketchViewRef?.isRulerMode = false
-                },
-                isSelected = selectedBrush == BrushType.PENCIL && !isRulerMode
-            )
-
-            ActionIconBtn(
-                drawableRes = R.drawable.send,
-                desc = "Lưu",
-                onClick = {
-                    sketchViewRef?.getBitmap()?.let { saveBitmapAndReturn(it) }
-                }
-            )
-
-            ActionIconBtn(drawableRes = R.drawable.scan, desc = "Quét", onClick = {})
-
-            ActionIconBtn(
-                drawableRes = R.drawable.cam,
-                desc = "Chụp ảnh",
-                onClick = {
-                    val file = File(
-                        context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
-                        "sketch_bg_${System.currentTimeMillis()}.jpg"
+            // Action box chỉ chứa 6 icon còn lại
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .shadow(elevation = 4.dp, shape = RoundedCornerShape(20.dp)),
+                color = Color.White,
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    // Mic (placeholder)
+                    ActionIconBtn(
+                        drawableRes = R.drawable.mic,
+                        desc = "Ghi âm",
+                        onClick = {},
+                        isSelected = false
                     )
-                    val uri = FileProvider.getUriForFile(
-                        context, "${context.packageName}.fileprovider", file
-                    )
-                    cameraUri.value = uri
-                    cameraLauncher.launch(uri)
-                }
-            )
 
-            ActionIconBtn(
-                drawableRes = R.drawable.image,
-                desc = "Chọn ảnh",
-                onClick = { imagePickerLauncher.launch("image/*") }
-            )
+                    // Pen / Bút
+                    ActionIconBtn(
+                        drawableRes = R.drawable.pen,
+                        desc = "Bút",
+                        onClick = {
+                            selectedBrush = BrushType.PENCIL
+                            isRulerMode = false
+                            sketchViewRef?.isRulerMode = false
+                        },
+                        isSelected = selectedBrush == BrushType.PENCIL && !isRulerMode
+                    )
+
+                    // Lưu
+                    ActionIconBtn(
+                        drawableRes = R.drawable.send,
+                        desc = "Lưu",
+                        onClick = {
+                            sketchViewRef?.getBitmap()?.let { saveBitmapAndReturn(it) }
+                        }
+                    )
+
+                    // Scan
+                    ActionIconBtn(
+                        drawableRes = R.drawable.scan,
+                        desc = "Quét",
+                        onClick = {}
+                    )
+
+                    // Camera
+                    ActionIconBtn(
+                        drawableRes = R.drawable.cam,
+                        desc = "Chụp ảnh",
+                        onClick = {
+                            val file = File(
+                                context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+                                "sketch_bg_${System.currentTimeMillis()}.jpg"
+                            )
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file
+                            )
+                            cameraUri.value = uri
+                            cameraLauncher.launch(uri)
+                        }
+                    )
+
+                    // Gallery
+                    ActionIconBtn(
+                        drawableRes = R.drawable.image,
+                        desc = "Chọn ảnh",
+                        onClick = { imagePickerLauncher.launch("image/*") }
+                    )
+                }
+            }
         }
 
-        // ── Vùng vẽ chính ────────────────────────────────────────────────────
+        // ── Vùng vẽ chính ─────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -258,28 +307,38 @@ fun SketchScreen(
                 )
             }
 
-            // Palette FAB
+            // ── YC3: FAB Palette đổi màu theo selectedColor ─────────────────
+            val fabBg = if (selectedBrush == BrushType.ERASER) Color(0xFF222222)
+            else selectedColor
+            // Icon màu tương phản với nền FAB
+            val fabIconTint = if (fabBg.luminance() > 0.5f) Color(0xFF222222) else Color.White
+
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(12.dp)
-                    .size(38.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF222222))
+                    .background(fabBg)
+                    .then(
+                        if (fabBg == Color.White || fabBg.luminance() > 0.85f)
+                            Modifier.border(1.dp, Color(0xFFDDDDDD), CircleShape)
+                        else Modifier
+                    )
                     .clickable { showColorPickerDialog = true },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Palette,
                     contentDescription = "Bảng màu",
-                    tint = Yellow,
+                    tint = fabIconTint,
                     modifier = Modifier.size(20.dp)
                 )
             }
         }
 
-        // ── Bottom panel ──────────────────────────────────────────────────────
-        Surface(color = BgColor, tonalElevation = 0.dp) {
+        // ── Bottom panel ───────────────────────────────────────────────────────
+        Surface(color = SketchBg, tonalElevation = 0.dp) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -287,7 +346,6 @@ fun SketchScreen(
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-
                 // Size slider
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -306,8 +364,8 @@ fun SketchScreen(
                         valueRange = 2f..60f,
                         modifier = Modifier.weight(1f),
                         colors = SliderDefaults.colors(
-                            thumbColor = Yellow,
-                            activeTrackColor = Yellow,
+                            thumbColor = SketchYellow,
+                            activeTrackColor = SketchYellow,
                             inactiveTrackColor = Color(0xFFDDDDDD)
                         )
                     )
@@ -321,101 +379,71 @@ fun SketchScreen(
                                 else selectedColor
                             )
                             .then(
-                                if (selectedColor == Color.White)
+                                if (selectedColor == Color.White || selectedBrush == BrushType.ERASER)
                                     Modifier.border(1.dp, Color(0xFFDDDDDD), CircleShape)
                                 else Modifier
                             )
                     )
                 }
 
-                // Brush selector row
+                // Brush selector
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     BrushIconBtn(
-                        drawableRes = R.drawable.pen1,
-                        desc = "Bút chì",
+                        drawableRes = R.drawable.pen1, desc = "Bút chì",
                         isSelected = selectedBrush == BrushType.PENCIL && !isRulerMode,
                         selectedColor = selectedColor
-                    ) {
-                        selectedBrush = BrushType.PENCIL
-                        isRulerMode = false
-                        sketchViewRef?.isRulerMode = false
-                    }
+                    ) { selectedBrush = BrushType.PENCIL; isRulerMode = false; sketchViewRef?.isRulerMode = false }
 
                     BrushIconBtn(
-                        drawableRes = R.drawable.pen2,
-                        desc = "Marker",
+                        drawableRes = R.drawable.pen2, desc = "Marker",
                         isSelected = selectedBrush == BrushType.MARKER && !isRulerMode,
                         selectedColor = selectedColor
-                    ) {
-                        selectedBrush = BrushType.MARKER
-                        isRulerMode = false
-                        sketchViewRef?.isRulerMode = false
-                    }
+                    ) { selectedBrush = BrushType.MARKER; isRulerMode = false; sketchViewRef?.isRulerMode = false }
 
                     BrushIconBtn(
-                        drawableRes = R.drawable.pen3,
-                        desc = "Dạ quang",
+                        drawableRes = R.drawable.pen3, desc = "Dạ quang",
                         isSelected = selectedBrush == BrushType.HIGHLIGHTER && !isRulerMode,
                         selectedColor = selectedColor
-                    ) {
-                        selectedBrush = BrushType.HIGHLIGHTER
-                        isRulerMode = false
-                        sketchViewRef?.isRulerMode = false
-                    }
+                    ) { selectedBrush = BrushType.HIGHLIGHTER; isRulerMode = false; sketchViewRef?.isRulerMode = false }
 
                     BrushIconBtn(
-                        drawableRes = R.drawable.pen4,
-                        desc = "Bút sáp",
+                        drawableRes = R.drawable.pen4, desc = "Bút sáp",
                         isSelected = selectedBrush == BrushType.CRAYON && !isRulerMode,
                         selectedColor = selectedColor
-                    ) {
-                        selectedBrush = BrushType.CRAYON
-                        isRulerMode = false
-                        sketchViewRef?.isRulerMode = false
-                    }
+                    ) { selectedBrush = BrushType.CRAYON; isRulerMode = false; sketchViewRef?.isRulerMode = false }
 
                     BrushIconBtn(
-                        drawableRes = R.drawable.eraser,
-                        desc = "Tẩy",
-                        isSelected = selectedBrush == BrushType.ERASER && !isRulerMode,
+                        drawableRes = R.drawable.eraser, desc = "Tẩy",
+                        isSelected = selectedBrush == BrushType.ERASER,
                         selectedColor = Color(0xFFE53935)
-                    ) {
-                        selectedBrush = BrushType.ERASER
-                        isRulerMode = false
-                        sketchViewRef?.isRulerMode = false
-                    }
+                    ) { selectedBrush = BrushType.ERASER; isRulerMode = false; sketchViewRef?.isRulerMode = false }
 
                     BrushIconBtn(
-                        drawableRes = R.drawable.ruler,
-                        desc = "Thước kẻ",
+                        drawableRes = R.drawable.ruler, desc = "Thước kẻ",
                         isSelected = isRulerMode,
                         selectedColor = selectedColor
-                    ) {
-                        isRulerMode = !isRulerMode
-                        sketchViewRef?.toggleRuler()
-                    }
+                    ) { isRulerMode = !isRulerMode; sketchViewRef?.toggleRuler() }
                 }
 
-                // Color palette row
+                // Color palette
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     paletteColors.forEach { color ->
-                        val isSelected = selectedColor == color &&
-                                selectedBrush != BrushType.ERASER
+                        val isSelected = selectedColor == color && selectedBrush != BrushType.ERASER
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(if (isSelected) 38.dp else 34.dp)
+                                    .size(if (isSelected) 36.dp else 32.dp)
                                     .clip(CircleShape)
                                     .background(color)
                                     .then(
@@ -425,7 +453,7 @@ fun SketchScreen(
                                     )
                                     .then(
                                         if (isSelected)
-                                            Modifier.border(2.5.dp, Yellow, CircleShape)
+                                            Modifier.border(2.5.dp, SketchYellow, CircleShape)
                                         else Modifier
                                     )
                                     .clickable {
@@ -438,12 +466,12 @@ fun SketchScreen(
                             if (isSelected) {
                                 Box(
                                     modifier = Modifier
-                                        .size(6.dp)
+                                        .size(5.dp)
                                         .clip(CircleShape)
-                                        .background(Yellow)
+                                        .background(SketchYellow)
                                 )
                             } else {
-                                Spacer(modifier = Modifier.size(6.dp))
+                                Spacer(modifier = Modifier.size(5.dp))
                             }
                         }
                     }
@@ -454,7 +482,7 @@ fun SketchScreen(
         }
     }
 
-    // Color Picker Dialog
+    // ── Color Picker Dialog ────────────────────────────────────────────────────
     if (showColorPickerDialog) {
         val controller = rememberColorPickerController()
         Dialog(onDismissRequest = { showColorPickerDialog = false }) {
@@ -491,11 +519,7 @@ fun SketchScreen(
                             .background(selectedColor)
                             .then(
                                 if (selectedColor == Color.White)
-                                    Modifier.border(
-                                        1.dp,
-                                        Color(0xFFDDDDDD),
-                                        RoundedCornerShape(10.dp)
-                                    )
+                                    Modifier.border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(10.dp))
                                 else Modifier
                             )
                     )
@@ -515,7 +539,7 @@ fun SketchScreen(
                                 showColorPickerDialog = false
                             },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Yellow)
+                            colors = ButtonDefaults.buttonColors(containerColor = SketchYellow)
                         ) { Text("Áp dụng", color = Color.Black) }
                     }
                 }
@@ -524,7 +548,7 @@ fun SketchScreen(
     }
 }
 
-// ── Action bar icon button ────────────────────────────────────────────────────
+// ── ActionIconBtn ─────────────────────────────────────────────────────────────
 @Composable
 private fun ActionIconBtn(
     drawableRes: Int,
@@ -541,8 +565,7 @@ private fun ActionIconBtn(
                 .size(38.dp)
                 .clip(CircleShape)
                 .background(
-                    if (isSelected) Yellow.copy(alpha = 0.9f)
-                    else Color.Transparent
+                    if (isSelected) SketchYellow.copy(alpha = 0.9f) else Color.Transparent
                 )
                 .clickable { onClick() },
             contentAlignment = Alignment.Center
@@ -550,7 +573,7 @@ private fun ActionIconBtn(
             Icon(
                 painter = painterResource(id = drawableRes),
                 contentDescription = desc,
-                tint = if (isSelected) Color.White else Color(0xFF333333),
+                tint = if (isSelected) Color.White else Color.Unspecified,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -559,7 +582,7 @@ private fun ActionIconBtn(
                 modifier = Modifier
                     .size(5.dp)
                     .clip(CircleShape)
-                    .background(Yellow)
+                    .background(SketchYellow)
             )
         } else {
             Spacer(modifier = Modifier.size(5.dp))
@@ -567,7 +590,7 @@ private fun ActionIconBtn(
     }
 }
 
-// ── Brush tool button ─────────────────────────────────────────────────────────
+// ── BrushIconBtn ──────────────────────────────────────────────────────────────
 @Composable
 private fun BrushIconBtn(
     drawableRes: Int,
@@ -584,7 +607,7 @@ private fun BrushIconBtn(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(if (isSelected) Yellow else Color.White)
+                .background(if (isSelected) SketchYellow else Color.White)
                 .border(
                     width = if (isSelected) 0.dp else 1.dp,
                     color = Color(0xFFE0E0E0),
@@ -605,7 +628,7 @@ private fun BrushIconBtn(
                 modifier = Modifier
                     .size(6.dp)
                     .clip(CircleShape)
-                    .background(Yellow)
+                    .background(SketchYellow)
             )
         } else {
             Spacer(modifier = Modifier.size(6.dp))

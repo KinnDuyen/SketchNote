@@ -1,3 +1,4 @@
+//
 package com.example.sketchnote
 
 import android.os.Bundle
@@ -54,6 +55,8 @@ class MainActivity : FragmentActivity() {
                                 onUnlocked = {
                                     navController.navigate("home") {
                                         popUpTo("biometric") { inclusive = true }
+                                        launchSingleTop = true  // ← thêm dòng này
+
                                     }
                                 }
                             )

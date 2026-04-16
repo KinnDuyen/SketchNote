@@ -42,4 +42,9 @@ interface NoteDao {
 
     @Query("DELETE FROM notes WHERE isDeleted = 1")
     suspend fun emptyTrash()
+
+    // Trong NoteDao.kt, thêm:
+    @Query("SELECT * FROM notes WHERE isDeleted = 0")
+    suspend fun getAllNotesNonFlow(): List<NoteEntity>
+
 }

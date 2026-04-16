@@ -23,30 +23,46 @@ fun BiometricScreen(onUnlocked: () -> Unit) {
     val context = LocalContext.current
     var errorMsg by remember { mutableStateOf("") }
     val executor = remember { ContextCompat.getMainExecutor(context) }
-
-    // Biến để kiểm soát trạng thái bảng vân tay đã hiện chưa, tránh hiện chồng nhau
     var isPromptShowing by remember { mutableStateOf(false) }
+
+    // YC1 FIX: dùng callback state để tránh gọi navigation từ sai thread
+    var shouldNavigate by remember { mutableStateOf(false) }
+
+    // Khi shouldNavigate = true → gọi onUnlocked() trong Compose context (main thread an toàn)
+    LaunchedEffect(shouldNavigate) {
+        if (shouldNavigate) {
+            shouldNavigate = false
+            try {
+                onUnlocked()
+            } catch (e: Exception) {
+                // ignore navigation errors
+            }
+        }
+    }
 
     val authenticate = {
         if (!isPromptShowing) {
             val activity = context as? FragmentActivity
             if (activity != null) {
                 isPromptShowing = true
-                val biometricPrompt = BiometricPrompt(activity, executor,
+                val biometricPrompt = BiometricPrompt(
+                    activity,
+                    executor,
                     object : BiometricPrompt.AuthenticationCallback() {
                         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                             super.onAuthenticationSucceeded(result)
                             isPromptShowing = false
-                            // Ép chạy chuyển trang ngay lập tức trên luồng giao diện (Main Thread)
-                            activity.runOnUiThread {
-                                onUnlocked()
-                            }
+                            // YC1 FIX: không gọi onUnlocked() trực tiếp, set flag để Compose xử lý
+                            shouldNavigate = true
                         }
 
                         override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                             super.onAuthenticationError(errorCode, errString)
                             isPromptShowing = false
-                            errorMsg = errString.toString()
+                            if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                                errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                                errorMsg = errString.toString()
+                            }
                         }
 
                         override fun onAuthenticationFailed() {
@@ -54,7 +70,8 @@ fun BiometricScreen(onUnlocked: () -> Unit) {
                             isPromptShowing = false
                             errorMsg = "Máy không nhận ra vân tay này, thử lại nha cưng!"
                         }
-                    })
+                    }
+                )
 
                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
                     .setTitle("Xác thực chính chủ")
@@ -68,9 +85,8 @@ fun BiometricScreen(onUnlocked: () -> Unit) {
         }
     }
 
-    // Tự động gọi xác thực khi màn hình vừa mở
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(500) // Chờ 0.5 giây cho người dùng ngắm UI đẹp của cưng đã
+        kotlinx.coroutines.delay(500)
         authenticate()
     }
 
@@ -83,7 +99,6 @@ fun BiometricScreen(onUnlocked: () -> Unit) {
             imageVector = if (errorMsg.isEmpty()) Icons.Default.Fingerprint else Icons.Default.Lock,
             contentDescription = null,
             modifier = Modifier.size(100.dp),
-            // ANH ĐÃ ĐỔI MÀU Ở ĐÂY: DÙNG CHUNG MỘT MÀU VÀNG KIM CHO CẢ 2 BIỂU TƯỢNG
             tint = Color(0xFFF9DC3B)
         )
 
@@ -107,7 +122,6 @@ fun BiometricScreen(onUnlocked: () -> Unit) {
 
         Spacer(Modifier.height(40.dp))
 
-        // Nút thử lại nếu bảng vân tay bị đóng mất
         Button(
             onClick = {
                 errorMsg = ""

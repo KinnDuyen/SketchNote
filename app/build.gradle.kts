@@ -92,5 +92,5 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.github.skydoves:colorpicker-compose:1.0.7")
     implementation("net.objecthunter:exp4j:0.4.8")
-
+    implementation("com.google.code.gson:gson:2.10.1")
 }

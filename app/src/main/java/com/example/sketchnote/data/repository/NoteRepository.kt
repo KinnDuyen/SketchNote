@@ -1,5 +1,7 @@
 package com.example.sketchnote.data.repository
 
+import android.content.Context
+import com.example.sketchnote.data.local.SketchNoteDatabase
 import com.example.sketchnote.data.local.dao.ChecklistItemDao
 import com.example.sketchnote.data.local.dao.NoteDao
 import com.example.sketchnote.data.local.entity.ChecklistItemEntity
@@ -47,4 +49,24 @@ class NoteRepository @Inject constructor(
         checklistDao.deleteItem(id)
     suspend fun deleteItemsByNote(noteId: Int) =
         checklistDao.deleteItemsByNote(noteId)
+
+    companion object {
+        @Volatile
+        private var INSTANCE: NoteRepository? = null
+
+        fun getInstance(context: Context): NoteRepository {
+            return INSTANCE ?: synchronized(this) {
+                var instance = INSTANCE
+                if (instance == null) {
+                    val database = SketchNoteDatabase.getDatabase(context)
+                    instance = NoteRepository(
+                        dao = database.noteDao(),
+                        checklistDao = database.checklistItemDao()
+                    )
+                    INSTANCE = instance
+                }
+                instance
+            }
+        }
+    }
 }

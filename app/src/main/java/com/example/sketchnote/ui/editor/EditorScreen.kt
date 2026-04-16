@@ -99,7 +99,7 @@ fun SketchNoteLogo(modifier: Modifier = Modifier) {
     }
 }
 
-// ── VisualTransformation để hiển thị highlight trong TextField ───────────────
+// ── VisualTransformation highlight ───────────────────────────────────────────
 class HighlightVisualTransformation(
     private val highlights: List<HighlightSpan>
 ) : VisualTransformation {
@@ -136,16 +136,16 @@ fun EditorScreen(
     val type          by viewModel.type.collectAsStateWithLifecycle()
     val contentBlocks by viewModel.contentBlocks.collectAsStateWithLifecycle()
 
-    var showHighlightPicker    by remember { mutableStateOf(false) }
+    var showHighlightPicker     by remember { mutableStateOf(false) }
     var currentHighlightBlockId by remember { mutableStateOf<String?>(null) }
-    var currentSelectionRange  by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var showSketchDialog       by remember { mutableStateOf(false) }
-    var editingSketchBlockId   by remember { mutableStateOf<String?>(null) }
-    var activeTool             by remember { mutableStateOf<String?>(null) }
-    var cameraUri              by remember { mutableStateOf<Uri?>(null) }
-    var showExportMenu         by remember { mutableStateOf(false) }
-    val speechHelper           = remember { SpeechHelper(context) }
-    var isListening            by remember { mutableStateOf(false) }
+    var currentSelectionRange   by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var showSketchDialog        by remember { mutableStateOf(false) }
+    var editingSketchBlockId    by remember { mutableStateOf<String?>(null) }
+    var activeTool              by remember { mutableStateOf<String?>(null) }
+    var cameraUri               by remember { mutableStateOf<Uri?>(null) }
+    var showExportMenu          by remember { mutableStateOf(false) }
+    val speechHelper            = remember { SpeechHelper(context) }
+    var isListening             by remember { mutableStateOf(false) }
 
     var suggestedTag by remember { mutableStateOf<String?>(null) }
     val allText = contentBlocks.filterIsInstance<ContentBlock.TextBlock>()
@@ -167,15 +167,20 @@ fun EditorScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            val file = File(
-                context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
-                "photo_${System.currentTimeMillis()}.jpg"
-            )
-            val uri = FileProvider.getUriForFile(
-                context, "${context.packageName}.fileprovider", file
-            )
-            cameraUri = uri
-            cameraLauncher.launch(uri)
+            try {
+                val dir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+                    ?: context.filesDir
+                dir.mkdirs()
+                val file = File(dir, "photo_${System.currentTimeMillis()}.jpg")
+                val uri = FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", file
+                )
+                cameraUri = uri
+                cameraLauncher.launch(uri)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Không thể mở camera", Toast.LENGTH_SHORT).show()
+                activeTool = null
+            }
         } else {
             Toast.makeText(context, "Cần quyền camera", Toast.LENGTH_SHORT).show()
             activeTool = null
@@ -230,6 +235,7 @@ fun EditorScreen(
     Scaffold(containerColor = Color(0xFFFBFCF7)) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
 
+            // ── Top bar ───────────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .padding(horizontal = 18.dp).padding(top = 10.dp, bottom = 4.dp),
@@ -246,11 +252,13 @@ fun EditorScreen(
                 }
             }
 
+            // ── Back + Action bar ─────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Mũi tên tách riêng — không có box
                 IconButton(
                     onClick = { viewModel.saveNote(context, onBack) },
                     modifier = Modifier.size(36.dp)
@@ -265,7 +273,7 @@ fun EditorScreen(
                     color = Color.White, shape = RoundedCornerShape(20.dp)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
@@ -277,7 +285,7 @@ fun EditorScreen(
                         ActionToolButton(R.drawable.pen, "Vẽ", activeTool == "sketch") {
                             activeTool = null; editingSketchBlockId = null; showSketchDialog = true
                         }
-                        Box {
+                        Box(contentAlignment = Alignment.Center) {
                             ActionToolButton(R.drawable.send, "Xuất",
                                 activeTool == "export" || showExportMenu) {
                                 activeTool = "export"; showExportMenu = true
@@ -366,8 +374,7 @@ fun EditorScreen(
                                     modifier = Modifier.weight(1f),
                                     color = MaterialTheme.colorScheme.onTertiaryContainer)
                                 TextButton(onClick = {
-                                    viewModel.onColorTagChange(suggestedTag!!)
-                                    suggestedTag = null
+                                    viewModel.onColorTagChange(suggestedTag!!); suggestedTag = null
                                 }) { Text("Áp dụng") }
                                 TextButton(onClick = { suggestedTag = null }) { Text("Bỏ qua") }
                             }
@@ -381,15 +388,13 @@ fun EditorScreen(
 
                 item {
                     TextField(
-                        value = title,
-                        onValueChange = viewModel::onTitleChange,
+                        value = title, onValueChange = viewModel::onTitleChange,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                         placeholder = {
                             Text("Tiêu đề", fontSize = 22.sp, fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
                         },
-                        textStyle = LocalTextStyle.current.copy(
-                            fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
                         colors = TextFieldDefaults.colors(
                             unfocusedContainerColor = Color.Transparent,
                             focusedContainerColor = Color.Transparent,
@@ -449,10 +454,8 @@ fun EditorScreen(
                                         TextBlockItem(
                                             block = block,
                                             onTextChange = { newText ->
-                                                // YC2: tính toán tự động
                                                 val result = MathCalculator.detectAndCalculate(newText)
                                                 val finalText = if (result != null) {
-                                                    // Thêm kết quả vào cuối, bỏ dấu = đang gõ
                                                     "${newText.trimEnd().trimEnd('=')}= $result"
                                                 } else newText
                                                 viewModel.updateTextBlock(block.id, finalText)
@@ -468,6 +471,7 @@ fun EditorScreen(
                                         )
                                     }
                                     is ContentBlock.SketchBlock -> {
+                                        // YC2 FIX: SketchBlockItem giờ hiển thị ảnh thật
                                         SketchBlockItem(
                                             block = block,
                                             onEdit = {
@@ -510,7 +514,7 @@ fun EditorScreen(
         }
     }
 
-    // ── Highlight Picker Dialog ──────────────────────────────────────────────
+    // ── Highlight Picker Dialog ───────────────────────────────────────────────
     if (showHighlightPicker) {
         AlertDialog(
             onDismissRequest = { showHighlightPicker = false },
@@ -551,7 +555,7 @@ fun EditorScreen(
         )
     }
 
-    // ── Sketch Dialog ────────────────────────────────────────────────────────
+    // ── Sketch Dialog — mở SketchScreen dạng dialog toàn màn hình ────────────
     if (showSketchDialog) {
         Dialog(
             onDismissRequest = { showSketchDialog = false },
@@ -575,7 +579,7 @@ fun EditorScreen(
     }
 }
 
-// ── ActionToolButton ─────────────────────────────────────────────────────────
+// ── ActionToolButton — vòng tròn vàng khi active ─────────────────────────────
 @Composable
 private fun ActionToolButton(
     drawableRes: Int,
@@ -704,7 +708,7 @@ fun ReminderSection(
     }
 }
 
-// ── YC1 FIX: TextBlockItem — dùng VisualTransformation, 1 layer duy nhất ─────
+// ── TextBlockItem ─────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TextBlockItem(
@@ -715,20 +719,17 @@ private fun TextBlockItem(
     highlights: List<HighlightSpan>,
     onShowHighlightPicker: (blockId: String, start: Int, end: Int) -> Unit
 ) {
-    // Dùng TextFieldValue để track cursor position và selection
     var textFieldValue by remember(block.id) {
         mutableStateOf(TextFieldValue(block.text))
     }
-
-    // Sync khi text thay đổi từ bên ngoài
     LaunchedEffect(block.text) {
         if (textFieldValue.text != block.text) {
             textFieldValue = TextFieldValue(block.text)
         }
     }
+    val context = LocalContext.current
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        // YC1: BasicTextField duy nhất + VisualTransformation cho highlight
         BasicTextField(
             value = textFieldValue,
             onValueChange = { newValue ->
@@ -739,13 +740,8 @@ private fun TextBlockItem(
                 .weight(1f)
                 .heightIn(min = 80.dp)
                 .padding(4.dp),
-            textStyle = TextStyle(
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
-                color = Color.Black
-            ),
+            textStyle = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, color = Color.Black),
             cursorBrush = SolidColor(Color(0xFFFCC701)),
-            // ← VisualTransformation áp highlight lên text, không tạo layer mới
             visualTransformation = if (highlights.isEmpty()) VisualTransformation.None
             else HighlightVisualTransformation(highlights),
             decorationBox = { innerTextField ->
@@ -759,23 +755,16 @@ private fun TextBlockItem(
                 }
             }
         )
-
-        // Nút bên phải
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // Nút highlight — highlight vùng đang select
             IconButton(
                 onClick = {
                     val selection = textFieldValue.selection
                     val start = selection.min
                     val end = selection.max
                     if (start < end) {
-                        // Có vùng bôi đen → hiện picker
                         onShowHighlightPicker(block.id, start, end)
                     } else {
-                        Toast.makeText(
-                            /* context handled by parent */
-                            null, "Hãy bôi đen văn bản trước", Toast.LENGTH_SHORT
-                        )
+                        Toast.makeText(context, "Hãy bôi đen văn bản trước", Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.size(32.dp)
@@ -783,7 +772,6 @@ private fun TextBlockItem(
                 Icon(Icons.Default.Brush, contentDescription = "Highlight",
                     tint = Color(0xFFFCC701), modifier = Modifier.size(20.dp))
             }
-
             if (showDelete) {
                 IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp),
@@ -794,40 +782,72 @@ private fun TextBlockItem(
     }
 }
 
-// ── SketchBlockItem ───────────────────────────────────────────────────────────
+// ── YC2 FIX: SketchBlockItem — hiển thị ảnh thật thay vì chỉ text ────────────
 @Composable
 private fun SketchBlockItem(
     block: ContentBlock.SketchBlock,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(8.dp).clickable { onEdit() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Edit, null, tint = Color(0xFFFCC701),
-                    modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Bản vẽ", fontSize = 14.sp, color = Color.Gray)
-                if (block.imagePath.isNotBlank()) {
-                    Spacer(Modifier.width(6.dp))
-                    Text("✓ Đã lưu", fontSize = 10.sp, color = Color(0xFF4CAF50))
+        if (block.imagePath.isNotBlank()) {
+            // Có ảnh → hiển thị ảnh thật
+            Box(modifier = Modifier.fillMaxWidth()) {
+                AsyncImage(
+                    model = File(block.imagePath),
+                    contentDescription = "Bản vẽ",
+                    contentScale = ContentScale.FillWidth,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onEdit() }
+                )
+                // Overlay buttons góc trên phải
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 4.dp)
+                ) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Edit, "Sửa", tint = Color.White,
+                            modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Delete, "Xóa", tint = Color(0xFFFF6B6B),
+                            modifier = Modifier.size(16.dp))
+                    }
                 }
             }
-            Row {
-                IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp),
-                        tint = Color(0xFFFCC701))
+        } else {
+            // Chưa có ảnh → hiển thị placeholder có thể nhấn để vẽ
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF5F5F5))
+                    .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+                    .clickable { onEdit() },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Edit, null, tint = Color(0xFFFCC701),
+                        modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text("Nhấn để vẽ", fontSize = 14.sp, color = Color.Gray)
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp),
+                // Nút xóa góc trên phải
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.align(Alignment.TopEnd).size(28.dp)
+                ) {
+                    Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp),
                         tint = Color.Gray)
                 }
             }

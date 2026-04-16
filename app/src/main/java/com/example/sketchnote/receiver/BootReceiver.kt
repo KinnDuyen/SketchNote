@@ -3,28 +3,32 @@ package com.example.sketchnote.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.example.sketchnote.data.local.SketchNoteDatabase
 import com.example.sketchnote.utils.AlarmScheduler
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import com.example.sketchnote.data.repository.NoteRepository
-import kotlinx.coroutines.*
+import kotlinx.coroutines.runBlocking
 
-@AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
 
-    @Inject
-    lateinit var repository: NoteRepository
-
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        CoroutineScope(Dispatchers.IO).launch {
-            repository.getAllNotes().collect { notes ->
-                notes.filter { it.reminderTime > System.currentTimeMillis() }
-                    .forEach { note ->
-                        AlarmScheduler.schedule(context, note.id, note.title,
-                            note.content, note.reminderTime)
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            // Khôi phục tất cả alarm còn hiệu lực
+            runBlocking {
+                val database = SketchNoteDatabase.getDatabase(context)
+                val noteDao = database.noteDao()
+                val notes = noteDao.getAllNotesNonFlow() // Cần thêm function này
+
+                val now = System.currentTimeMillis()
+                for (note in notes) {
+                    if (note.reminderTime > now) {
+                        AlarmScheduler.schedule(
+                            context = context,
+                            noteId = note.id,
+                            title = note.title.ifBlank { "Nhắc nhở" },
+                            content = note.content.ifBlank { "Bạn có ghi chú cần xem!" },
+                            timeMillis = note.reminderTime
+                        )
                     }
-                cancel() // chỉ collect 1 lần
+                }
             }
         }
     }

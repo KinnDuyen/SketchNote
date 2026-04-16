@@ -1,9 +1,6 @@
 package com.example.sketchnote.di
 
 import android.content.Context
-import androidx.room.Room
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.sketchnote.data.local.SketchNoteDatabase
 import com.example.sketchnote.data.local.dao.ChecklistItemDao
 import com.example.sketchnote.data.local.dao.NoteDao
@@ -21,13 +18,7 @@ object AppModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): SketchNoteDatabase {
-        return Room.databaseBuilder(
-            context,
-            SketchNoteDatabase::class.java,
-            "sketchnote_db"
-        )
-            .addMigrations(MIGRATION_1_2) // Kích hoạt Migration từ bản 1 sang 2
-            .build()
+        return SketchNoteDatabase.getDatabase(context)
     }
 
     @Provides
@@ -36,16 +27,5 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideChecklistItemDao(db: SketchNoteDatabase): ChecklistItemDao =
-        db.checklistItemDao()
-}
-
-/**
- * Định nghĩa Migration để thêm cột isPinned vào bảng notes
- * SQLite không có kiểu Boolean riêng, nên ta dùng INTEGER (0 là false, 1 là true)
- */
-private val MIGRATION_1_2 = object : Migration(1, 2) {
-    override fun migrate(database: SupportSQLiteDatabase) {
-        database.execSQL("ALTER TABLE notes ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
-    }
+    fun provideChecklistItemDao(db: SketchNoteDatabase): ChecklistItemDao = db.checklistItemDao()
 }

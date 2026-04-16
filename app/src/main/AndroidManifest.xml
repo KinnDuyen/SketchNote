@@ -2,28 +2,29 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Camera permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Storage permissions -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <!-- Notification & Alarm permissions -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Audio permission -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
-
+    <!-- Biometric permissions -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
 
@@ -39,6 +40,7 @@
         android:theme="@style/Theme.SketchNote"
         tools:targetApi="31">
 
+        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -50,18 +52,7 @@
             </intent-filter>
         </activity>
 
-        <receiver
-            android:name=".receiver.AlarmReceiver"
-            android:exported="false" />
-
-        <receiver
-            android:name=".receiver.BootReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-
+        <!-- File Provider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -72,6 +63,26 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Alarm Receiver - nhận alarm và hiển thị notification -->
+        <receiver
+            android:name=".service.AlarmReceiver"
+            android:exported="false" />
+
+        <!-- Dismiss Notification Receiver - xóa notification khi bấm nút "Đã xong" -->
+        <receiver
+            android:name=".service.DismissNotificationReceiver"
+            android:exported="false" />
+
+        <!-- Boot Receiver - khôi phục alarm sau khi khởi động lại máy -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Dismiss Sticky Receiver - xóa thông báo ghim -->
         <receiver
             android:name=".receiver.DismissStickyReceiver"
             android:exported="false" />
